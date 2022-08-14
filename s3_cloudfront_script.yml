@@ -1,0 +1,68 @@
+# AWS CLOUDFORMATION SCRIPT
+# Joshua Zavala
+# New Apprenticeship
+# AWS Cloud Practitioner Project
+# 26.05.2022
+
+# OBJECTIVE
+# Create an S3 static website available only through CloudFront.
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFront Website front-end with private S3 bucket configured with static website hosting
+
+Resources:
+  CloudFrontOriginAccess:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: 'My OAI Policy'
+  
+  Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: #name it whatever you want within s3 bucket naming rules
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: 'true'
+        BlockPublicPolicy: 'true'
+        IgnorePublicAcls: 'true'
+        RestrictPublicBuckets: 'true'
+      WebsiteConfiguration:
+        IndexDocument: index.html
+
+  BucketReadAccess:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref Bucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Join
+                - ''
+                - - 'arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity '
+                  - !Ref CloudFrontOriginAccess
+            Action: 's3:GetObject'
+            Resource:
+              - !Sub "arn:aws:s3:::${Bucket}/*"
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Origins:
+          - DomainName: !GetAtt
+              - Bucket
+              - DomainName
+            Id: !Ref Bucket
+            S3OriginConfig:
+              OriginAccessIdentity: !Join
+                - ''
+                - - 'origin-access-identity/cloudfront/'
+                  - !Ref CloudFrontOriginAccess
+        Enabled: 'true'
+        DefaultCacheBehavior:
+          ForwardedValues:
+            QueryString: 'false'
+          TargetOriginId: !Ref Bucket
+          ViewerProtocolPolicy: allow-all
